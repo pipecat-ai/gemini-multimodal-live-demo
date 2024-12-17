@@ -274,6 +274,7 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
   }, [rtviClient]);
   const handleSwitchToVoiceMode = useCallback(
     async (createIfNew = true) => {
+      if (!rtviClient) return;
       setIsVoiceMode(true);
       setError("");
       if (!conversationId && createIfNew) {
