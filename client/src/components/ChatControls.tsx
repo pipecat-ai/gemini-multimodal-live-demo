@@ -47,6 +47,7 @@ import {
   MicOffIcon,
   Minimize2Icon,
   PaperclipIcon,
+  ScreenShareIcon,
   Speech,
   TriangleAlertIcon,
   UploadCloudIcon,
@@ -90,6 +91,7 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
 
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [isCamMuted, setIsCamMuted] = useState(true);
+  const [isScreenMuted, setIsScreenMuted] = useState(true);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [videoSize, setVideoSize] = useState<VideoSize>("small");
   const [videoPlacement, setVideoPlacement] = useState<VideoPlacement>("right");
@@ -303,13 +305,35 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
     ),
   );
 
-  // Toggle between cam mute and unmute in voice mode
+  // Toggle webcam
   const handleCamToggle = useCallback(() => {
+    if (!isScreenMuted) {
+      // If screen sharing is on, turn it off
+      handleScreenToggle();
+    }
+
     setIsCamMuted((muted) => {
       rtviClient?.enableCam(muted);
       return !muted;
     });
-  }, [rtviClient]);
+  }, [rtviClient, isScreenMuted]);
+
+  // Toggle screen sharing
+  const handleScreenToggle = useCallback(() => {
+    if (!isCamMuted) {
+      // If camera is on, turn it off
+      handleCamToggle();
+    }
+
+    setIsScreenMuted((muted) => {
+      if (muted) {
+        rtviClient?.startScreenShare();
+      } else {
+        rtviClient?.stopScreenShare();
+      }
+      return !muted;
+    });
+  }, [rtviClient, isCamMuted]);
 
   // Toggle between mic mute and unmute in voice mode
   const handleMicToggle = useCallback(() => {
@@ -711,29 +735,31 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
         <div className="flex gap-2 justify-between sm:grid sm:grid-cols-3">
           <div className="flex items-end gap-2">
             {/* Image Button (File picker with camera support on mobile) */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    className="rounded-full relative"
-                    size="icon"
-                    variant="secondary-outline"
-                  >
-                    <PaperclipIcon />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="absolute inset-0 opacity-0 file:cursor-pointer file:inset-0 file:absolute"
-                      onChange={handleImageChange}
-                    />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="bg-background text-foreground shadow-sm">
-                  Attach images
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {transportState === "disconnected" && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      className="rounded-full relative"
+                      size="icon"
+                      variant="secondary-outline"
+                    >
+                      <PaperclipIcon />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="absolute inset-0 opacity-0 file:cursor-pointer file:inset-0 file:absolute"
+                        onChange={handleImageChange}
+                      />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-background text-foreground shadow-sm">
+                    Attach images
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
 
             {/* Cam button for mute/unmute */}
             {vision && isVoiceMode && (
@@ -749,12 +775,33 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
                         "bg-primary hover:bg-primary text-primary-foreground":
                           !isCamMuted,
                       })}
+                      disabled={transportState !== "ready"}
                     >
                       <WebcamIcon size={24} />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent className="bg-background text-foreground shadow-sm">
                     {isCamMuted ? "Turn on camera" : "Turn off camera"}
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="secondary-outline"
+                      onClick={handleScreenToggle}
+                      className={cn("rounded-full", {
+                        "bg-primary hover:bg-primary text-primary-foreground":
+                          !isScreenMuted,
+                      })}
+                      disabled={transportState !== "ready"}
+                    >
+                      <ScreenShareIcon size={24} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-background text-foreground shadow-sm">
+                    {isScreenMuted ? "Turn on camera" : "Turn off camera"}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
