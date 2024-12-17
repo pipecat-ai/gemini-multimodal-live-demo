@@ -313,7 +313,7 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
       handleScreenToggle();
     }
 
-    setIsCamMuted((muted) => {
+    setIsCamMuted((muted: boolean) => {
       rtviClient?.enableCam(muted);
       return !muted;
     });
@@ -326,12 +326,8 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
       handleCamToggle();
     }
 
-    setIsScreenMuted((muted) => {
-      if (muted) {
-        rtviClient?.startScreenShare();
-      } else {
-        rtviClient?.stopScreenShare();
-      }
+    setIsScreenMuted((muted: boolean) => {
+      rtviClient?.enableScreenShare(muted);
       return !muted;
     });
   }, [rtviClient, isCamMuted]);
