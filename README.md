@@ -1,3 +1,6 @@
+> [!CAUTION]
+> This repo is no longer maintained. Checkout [pipecat-examples](https://github.com/pipecat-ai/pipecat-examples) for recent demos and example code.
+
 # Chat Application Starter Kit — Gemini Multimodal Live API + Pipecat
 
 This repo is a starter kit showing how to build a full application using the Pipecat Web SDK and the Gemini Multimodal Live API.
