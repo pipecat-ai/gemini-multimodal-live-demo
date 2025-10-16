@@ -16,13 +16,14 @@ class BotFrameSerializer(FrameSerializer):
     def __init__(self):
         super().__init__()
 
+    @property
     def type(self) -> FrameSerializerType:
         return FrameSerializerType.TEXT
 
-    def serialize(self, frame: Frame) -> str | bytes | None:
+    async def serialize(self, frame: Frame) -> str | bytes | None:
         if isinstance(frame, TransportMessageUrgentFrame):
             logger.debug(f"Serializing urgent frame: {str(frame.message)[:120]}...")
             return encode_response(frame.message)
 
-    def deserialize(self, data: str | bytes) -> Frame | None:
+    async def deserialize(self, data: str | bytes) -> Frame | None:
         return None

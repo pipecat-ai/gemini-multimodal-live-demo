@@ -10,20 +10,19 @@ from common.models import Attachment, Message
 from fastapi import HTTPException, status
 from loguru import logger
 from openai._types import NOT_GIVEN
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineTask
 from pipecat.processors.async_generator import AsyncGeneratorProcessor
 from pipecat.processors.frameworks.rtvi import (
     RTVIActionRun,
-    RTVIBotLLMProcessor,
     RTVIMessage,
+    RTVIObserver,
     RTVIProcessor,
 )
 from pipecat.services.ai_services import OpenAILLMContext
 from pipecat.services.google import GoogleLLMContext, GoogleLLMService
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def http_bot_pipeline(
@@ -73,15 +72,11 @@ async def http_bot_pipeline(
     # Processing
     #
 
-    # This will send `bot-llm-*` messages.
-    rtvi_bot_llm = RTVIBotLLMProcessor()
-
     processors = [
         rtvi,
         user_aggregator,
         storage.create_processor(),
         llm,
-        rtvi_bot_llm,
         async_generator,
         assistant_aggregator,
         storage.create_processor(exit_on_endframe=True),
@@ -91,7 +86,7 @@ async def http_bot_pipeline(
 
     runner = PipelineRunner(handle_sigint=False)
 
-    task = PipelineTask(pipeline)
+    task = PipelineTask(pipeline, observers=[RTVIObserver(rtvi)])
 
     runner_task = asyncio.create_task(runner.run(task))
 

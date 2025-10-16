@@ -7,7 +7,7 @@ from typing import Awaitable, Callable
 import aiohttp
 from bots.types import BotCallbacks, BotConfig, BotParams
 from bots.webrtc.bot_error_pipeline import bot_error_pipeline_task
-from bots.webrtc.bot_pipeline import bot_pipeline
+from bots.webrtc.bot_pipeline import bot_pipeline_task
 from bots.webrtc.bot_pipeline_runner import BotPipelineRunner
 from common.config import SERVICE_API_KEYS
 from common.database import DatabaseSessionFactory
@@ -52,17 +52,7 @@ async def _pipeline_task(
     db: AsyncSession,
 ) -> Callable[[BotCallbacks], Awaitable[PipelineTask]]:
     async def create_task(callbacks: BotCallbacks) -> PipelineTask:
-        pipeline = await bot_pipeline(params, config, callbacks, room_url, room_token, db)
-
-        task = PipelineTask(
-            pipeline,
-            params=PipelineParams(
-                allow_interruptions=True,
-                enable_metrics=True,
-                send_initial_empty_metrics=False,
-            ),
-        )
-
+        task = await bot_pipeline_task(params, config, callbacks, room_url, room_token, db)
         return task
 
     return create_task

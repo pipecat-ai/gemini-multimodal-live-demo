@@ -1,5 +1,8 @@
 from typing import Any
 
+from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.processors.frameworks.rtvi import RTVIObserver
+
 from bots.persistent_context import PersistentContext
 from bots.rtvi import create_rtvi_processor
 from bots.types import BotCallbacks, BotConfig, BotParams
@@ -12,14 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.processors.frame_processor import FrameDirection
-from pipecat.processors.frameworks.rtvi import (
-    RTVIBotLLMProcessor,
-    RTVIBotTranscriptionProcessor,
-    RTVIBotTTSProcessor,
-    RTVISpeakingProcessor,
-    RTVIUserTranscriptionProcessor,
-)
 from pipecat.services.ai_services import OpenAILLMContext
 from pipecat.services.gemini_multimodal_live.gemini import (
     GeminiMultimodalLiveLLMService,
@@ -27,14 +22,14 @@ from pipecat.services.gemini_multimodal_live.gemini import (
 from pipecat.transports.services.daily import DailyParams, DailyTransport
 
 
-async def bot_pipeline(
+async def bot_pipeline_task(
     params: BotParams,
     config: BotConfig,
     callbacks: BotCallbacks,
     room_url: str,
     room_token: str,
     db: AsyncSession,
-) -> Pipeline:
+) -> PipelineTask:
     transport = DailyTransport(
         room_url,
         room_token,
@@ -78,32 +73,12 @@ async def bot_pipeline(
 
     rtvi = await create_rtvi_processor(config, user_aggregator)
 
-    # This will send `user-*-speaking` and `bot-*-speaking` messages.
-    rtvi_speaking = RTVISpeakingProcessor()
-
-    # This will send `user-transcription` messages.
-    rtvi_user_transcription = RTVIUserTranscriptionProcessor()
-
-    # This will send `bot-transcription` messages.
-    rtvi_bot_transcription = RTVIBotTranscriptionProcessor()
-
-    # This will send `bot-llm-*` messages.
-    rtvi_bot_llm = RTVIBotLLMProcessor()
-
-    # This will send `bot-tts-*` messages.
-    rtvi_bot_tts = RTVIBotTTSProcessor(direction=FrameDirection.UPSTREAM)
-
     processors = [
         transport.input(),
         rtvi,
         user_aggregator,
         llm_rt,
-        rtvi_speaking,
-        rtvi_user_transcription,
-        rtvi_bot_llm,
-        rtvi_bot_transcription,
         transport.output(),
-        rtvi_bot_tts,
         assistant_aggregator,
         storage.create_processor(exit_on_endframe=True),
     ]
@@ -151,4 +126,14 @@ async def bot_pipeline(
     async def on_call_state_updated(transport, state):
         await callbacks.on_call_state_updated(state)
 
-    return pipeline
+    task = PipelineTask(
+        pipeline,
+        params=PipelineParams(
+            allow_interruptions=True,
+            enable_metrics=True,
+            send_initial_empty_metrics=False,
+        ),
+        observers=[RTVIObserver(rtvi)]
+    )
+
+    return task

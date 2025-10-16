@@ -1,11 +1,11 @@
-loguru==0.7.2
-fastapi==0.115.0
+loguru==0.7.3
+fastapi==0.115.6
 python-multipart==0.0.19
 uvicorn==0.30.6
 python-dotenv==1.0.1
-pydantic==2.8.2
+pydantic==2.10.6
 argon2-cffi==23.1.0
 sqlalchemy[aiosqlite]==2.0.35
-pipecat-ai==0.0.50
+pipecat-ai==0.0.58
 jinja2==3.1.4
 cryptography==43.0.3
