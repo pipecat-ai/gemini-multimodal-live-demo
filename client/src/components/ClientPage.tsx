@@ -54,13 +54,14 @@ export function ClientPage() {
       emitter.off("showChatMessages", handleShowChatMessages);
     };
   }, []);
+
+  const [client, setClient] = useState<RTVIClient>();
+
   useEffect(() => {
     if (!conversationType) {
       setShowMessages(false);
     }
   }, [conversationType]);
-
-  const [client, setClient] = useState<RTVIClient>();
 
   useEffect(() => {
     if (!conversationType) {
@@ -81,9 +82,13 @@ export function ClientPage() {
             })
           : new DailyTransport(),
       params: {
-        baseUrl: import.meta.env.VITE_SERVER_URL,
+        baseUrl:
+          conversationType === "voice-to-voice"
+            ? null
+            : (import.meta.env.VITE_SERVER_URL as string),
         endpoints: {
-          connect: "/bot/connect",
+          connect:
+            conversationType === "voice-to-voice" ? null : "/bot/connect",
           action: "/bot/action",
         },
         requestData: {

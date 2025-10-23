@@ -21,6 +21,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { toast } from "@/hooks/use-toast";
 import { useAppState } from "@/hooks/useAppState";
 import emitter from "@/lib/eventEmitter";
 import { ImageContent, Message } from "@/lib/messages";
@@ -45,6 +46,8 @@ import {
   MicIcon,
   MicOffIcon,
   Minimize2Icon,
+  PaperclipIcon,
+  ScreenShareIcon,
   Speech,
   TriangleAlertIcon,
   UploadCloudIcon,
@@ -61,17 +64,17 @@ import {
   useState,
 } from "react";
 
-// const MAX_TOTAL_FILE_SIZE = 20.0 * 1e6; // 20 MB
+const MAX_TOTAL_FILE_SIZE = 20.0 * 1e6; // 20 MB
 
-// function getHumanReadableFilesize(size: number) {
-//   if (size < 1e3) {
-//     return `${size} bytes`;
-//   } else if (size >= 1e3 && size < 1e6) {
-//     return `${(size / 1e3).toFixed(1)} KB`;
-//   } else {
-//     return `${(size / 1e6).toFixed(1)} MB`;
-//   }
-// }
+function getHumanReadableFilesize(size: number) {
+  if (size < 1e3) {
+    return `${size} bytes`;
+  } else if (size >= 1e3 && size < 1e6) {
+    return `${(size / 1e3).toFixed(1)} KB`;
+  } else {
+    return `${(size / 1e6).toFixed(1)} MB`;
+  }
+}
 
 interface Props {
   onChangeMode?: (isVoiceMode: boolean) => void;
@@ -88,6 +91,7 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
 
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [isCamMuted, setIsCamMuted] = useState(true);
+  const [isScreenMuted, setIsScreenMuted] = useState(true);
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [videoSize, setVideoSize] = useState<VideoSize>("small");
   const [videoPlacement, setVideoPlacement] = useState<VideoPlacement>("right");
@@ -244,7 +248,7 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
     sendTextMessage(rtviClient, message);
   };
 
-  const handleConnect = useCallback(async () => {
+  const handleConnect = useCallback(() => {
     setIsVoiceMode(true);
     setIsMicMuted(false);
     rtviClient?.enableMic(true);
@@ -270,6 +274,7 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
   }, [rtviClient]);
   const handleSwitchToVoiceMode = useCallback(
     async (createIfNew = true) => {
+      if (!rtviClient) return;
       setIsVoiceMode(true);
       setError("");
       if (!conversationId && createIfNew) {
@@ -301,13 +306,31 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
     ),
   );
 
-  // Toggle between cam mute and unmute in voice mode
+  // Toggle webcam
   const handleCamToggle = useCallback(() => {
-    setIsCamMuted((muted) => {
+    if (!isScreenMuted) {
+      // If screen sharing is on, turn it off
+      handleScreenToggle();
+    }
+
+    setIsCamMuted((muted: boolean) => {
       rtviClient?.enableCam(muted);
       return !muted;
     });
-  }, [rtviClient]);
+  }, [rtviClient, isScreenMuted]);
+
+  // Toggle screen sharing
+  const handleScreenToggle = useCallback(() => {
+    if (!isCamMuted) {
+      // If camera is on, turn it off
+      handleCamToggle();
+    }
+
+    setIsScreenMuted((muted: boolean) => {
+      rtviClient?.enableScreenShare(muted);
+      return !muted;
+    });
+  }, [rtviClient, isCamMuted]);
 
   // Toggle between mic mute and unmute in voice mode
   const handleMicToggle = useCallback(() => {
@@ -318,45 +341,45 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
   }, [rtviClient]);
 
   // Handle image selection
-  // const handleImageChange = async (
-  //   event: React.ChangeEvent<HTMLInputElement>,
-  // ) => {
-  //   const files = Array.from(event.target.files ?? []);
-  //   if (files.length) {
-  //     const allowedFiles: File[] = [];
-  //     let total = 0;
-  //     let notifyUser = false;
-  //     files.forEach((file) => {
-  //       if (total + file.size < MAX_TOTAL_FILE_SIZE) {
-  //         allowedFiles.push(file);
-  //         total += file.size;
-  //       } else {
-  //         notifyUser = true;
-  //       }
-  //     });
+  const handleImageChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length) {
+      const allowedFiles: File[] = [];
+      let total = 0;
+      let notifyUser = false;
+      files.forEach((file) => {
+        if (total + file.size < MAX_TOTAL_FILE_SIZE) {
+          allowedFiles.push(file);
+          total += file.size;
+        } else {
+          notifyUser = true;
+        }
+      });
 
-  //     setSelectedImages((images) => [...images, ...allowedFiles]);
-  //     allowedFiles.forEach((f) => {
-  //       const reader = new FileReader();
-  //       reader.onload = (e) => {
-  //         const base64String = e.target?.result?.toString();
-  //         if (base64String) {
-  //           handleUploadFile(f, base64String);
-  //           setPreviewUrls((urls) => [...urls, base64String]);
-  //         }
-  //       };
-  //       reader.readAsDataURL(f);
-  //     });
-  //     if (notifyUser) {
-  //       toast({
-  //         title: `Exceeded maximum allowed attachment size of ${getHumanReadableFilesize(
-  //           MAX_TOTAL_FILE_SIZE,
-  //         )}`,
-  //       });
-  //     }
-  //   }
-  //   event.target.value = "";
-  // };
+      setSelectedImages((images) => [...images, ...allowedFiles]);
+      allowedFiles.forEach((f) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64String = e.target?.result?.toString();
+          if (base64String) {
+            handleUploadFile(f, base64String);
+            setPreviewUrls((urls) => [...urls, base64String]);
+          }
+        };
+        reader.readAsDataURL(f);
+      });
+      if (notifyUser) {
+        toast({
+          title: `Exceeded maximum allowed attachment size of ${getHumanReadableFilesize(
+            MAX_TOTAL_FILE_SIZE,
+          )}`,
+        });
+      }
+    }
+    event.target.value = "";
+  };
 
   // Remove the selected image
   const handleRemoveImage = (idx: number) => {
@@ -385,67 +408,67 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
     });
   };
 
-  // const handleUploadFile = async (file: File, base64: string) => {
-  //   const formData = new FormData();
-  //   formData.append("file", file);
+  const handleUploadFile = async (file: File, base64: string) => {
+    const formData = new FormData();
+    formData.append("file", file);
 
-  //   try {
-  //     const xhr = new XMLHttpRequest();
-  //     xhrsRef.current[base64] = xhr;
+    try {
+      const xhr = new XMLHttpRequest();
+      xhrsRef.current[base64] = xhr;
 
-  //     xhr.upload.addEventListener("progress", (event) => {
-  //       if (event.lengthComputable) {
-  //         const percentComplete = (event.loaded / event.total) * 100;
-  //         setUploadProgress((p) => ({
-  //           ...p,
-  //           [base64]: percentComplete,
-  //         }));
-  //       }
-  //     });
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = (event.loaded / event.total) * 100;
+          setUploadProgress((p) => ({
+            ...p,
+            [base64]: percentComplete,
+          }));
+        }
+      });
 
-  //     xhr.addEventListener("load", () => {
-  //       if (xhr.status >= 200 && xhr.status < 300) {
-  //         setUploadProgress((p) => ({
-  //           ...p,
-  //           [base64]: "done",
-  //         }));
-  //         const json = JSON.parse(xhr.responseText);
-  //         setAttachmentIds((ids) => [...ids, json.attachment_id]);
-  //       } else {
-  //         setUploadProgress((p) => ({
-  //           ...p,
-  //           [base64]: "error",
-  //         }));
-  //       }
-  //     });
+      xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          setUploadProgress((p) => ({
+            ...p,
+            [base64]: "done",
+          }));
+          const json = JSON.parse(xhr.responseText);
+          setAttachmentIds((ids) => [...ids, json.attachment_id]);
+        } else {
+          setUploadProgress((p) => ({
+            ...p,
+            [base64]: "error",
+          }));
+        }
+      });
 
-  //     xhr.addEventListener("error", () => {
-  //       setUploadProgress((p) => ({
-  //         ...p,
-  //         [base64]: "error",
-  //       }));
-  //     });
+      xhr.addEventListener("error", () => {
+        setUploadProgress((p) => ({
+          ...p,
+          [base64]: "error",
+        }));
+      });
 
-  //     xhr.addEventListener("abort", () => {
-  //       setUploadProgress((p) => ({
-  //         ...p,
-  //         [base64]: "error",
-  //       }));
-  //     });
+      xhr.addEventListener("abort", () => {
+        setUploadProgress((p) => ({
+          ...p,
+          [base64]: "error",
+        }));
+      });
 
-  //     xhr.open(
-  //       "POST",
-  //       `${import.meta.env.VITE_SERVER_URL}/conversations/upload`,
-  //     );
-  //     xhr.send(formData);
-  //   } catch {
-  //     setUploadProgress((p) => ({
-  //       ...p,
-  //       [base64]: "error",
-  //     }));
-  //     return null;
-  //   }
-  // };
+      xhr.open(
+        "POST",
+        `${import.meta.env.VITE_SERVER_URL}/conversations/upload`,
+      );
+      xhr.send(formData);
+    } catch {
+      setUploadProgress((p) => ({
+        ...p,
+        [base64]: "error",
+      }));
+      return null;
+    }
+  };
 
   useEffect(() => {
     if (previewUrls.length) return;
@@ -658,6 +681,7 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
             )}
           >
             <RTVIClientVideo
+              trackType="video"
               participant="local"
               fit="cover"
               className="w-full h-full"
@@ -708,30 +732,31 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
         <div className="flex gap-2 justify-between sm:grid sm:grid-cols-3">
           <div className="flex items-end gap-2">
             {/* Image Button (File picker with camera support on mobile) */}
-            {/* <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    className="rounded-full relative"
-                    size="icon"
-                    variant="secondary-outline"
-                  >
-                    <PaperclipIcon />
-                    {/* File input (visually hidden) *\/}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="absolute inset-0 opacity-0 file:cursor-pointer file:inset-0 file:absolute"
-                      onChange={handleImageChange}
-                    />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="bg-background text-foreground shadow-sm">
-                  Attach images
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider> */}
+            {transportState === "disconnected" && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      className="rounded-full relative"
+                      size="icon"
+                      variant="secondary-outline"
+                    >
+                      <PaperclipIcon />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="absolute inset-0 opacity-0 file:cursor-pointer file:inset-0 file:absolute"
+                        onChange={handleImageChange}
+                      />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-background text-foreground shadow-sm">
+                    Attach images
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
 
             {/* Cam button for mute/unmute */}
             {vision && isVoiceMode && (
@@ -747,12 +772,33 @@ const ChatControls: React.FC<Props> = ({ onChangeMode, vision = false }) => {
                         "bg-primary hover:bg-primary text-primary-foreground":
                           !isCamMuted,
                       })}
+                      disabled={transportState !== "ready"}
                     >
                       <WebcamIcon size={24} />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent className="bg-background text-foreground shadow-sm">
                     {isCamMuted ? "Turn on camera" : "Turn off camera"}
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="secondary-outline"
+                      onClick={handleScreenToggle}
+                      className={cn("rounded-full", {
+                        "bg-primary hover:bg-primary text-primary-foreground":
+                          !isScreenMuted,
+                      })}
+                      disabled={transportState !== "ready"}
+                    >
+                      <ScreenShareIcon size={24} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-background text-foreground shadow-sm">
+                    {isScreenMuted ? "Turn on camera" : "Turn off camera"}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
